@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1, minimum-scale=1, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<title>Unicorns!</title>
+<link href="style.css" type="text/css" rel="StyleSheet" />
+<script type="text/javascript">
+/*
+ The MIT License (MIT)
+
+ Copyright (c) 2016 Samuel Goldstein
+
+ Permission is hereby granted, free of charge, to any person obtaining a copy
+ of this software and associated documentation files (the "Software"), to deal
+ in the Software without restriction, including without limitation the rights
+ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ copies of the Software, and to permit persons to whom the Software is
+ furnished to do so, subject to the following conditions:
+
+ The above copyright notice and this permission notice shall be included in all
+ copies or substantial portions of the Software.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+ */
+function DesignObj(ctx)
+{
+    var dobj = {
+        ctx: ctx,
+        docwidth: 0,
+        docheight: 0,
+        step: 0,
+        bandthick: 1,
+        rad: 0,
+        delay: 50,
+        score: 0,
+        score_y: false,
+        score_x: false,
+        timer: false,
+        fgcol: '#000',
+        bgcol: '#cef',
+        rbcols: ['f99','fd7','ff7','8f8','6ee','9af','c8f'],
+        hts:[],
+        htsm:[],
+        snds:{},
+        hc:50,
+        heart_step:0,
+        heart_step2:0,
+        uni_width:0,
+        uni_height:0,
+        sc_width:0,
+        sc_height:0,
+        audio:true,
+        uni: false,
+        firing: false,
+        running: true,
+        initialize: function ()
+        {
+            dobj.ctx.fillStyle = dobj.bgcol;
+            dobj.ctx.lineWidth = dobj.linestroke;
+            dobj.ctx.strokeStyle = dobj.fgcol;
+            dobj.fill([0, 0, dobj.docwidth, 0, dobj.docwidth, dobj.docheight, 0, dobj.docheight]);
+
+            var cx = dobj.docwidth/2;
+            var cy = dobj.docheight/2;
+            var size = Math.sqrt(dobj.docwidth*dobj.docwidth + dobj.docheight*dobj.docheight);
+            dobj.bandthick = 0.01 * dobj.docwidth;
+            dobj.rad = 0.1 * dobj.docwidth;
+
+            var bod = document.getElementById("body");
+            for(i=0;i<dobj.hc;i++)
+            {
+                var k = new Image();
+                k.src = "images/heart.gif";
+                k.style.position="fixed";
+                k.id = 'hh'+i;
+                bod.appendChild(k);
+                dobj.htsm.push({x:0,y:0,r:0});
+            }
+            dobj.resetHearts(10000,0,false);
+            dobj.resetHearts(10000,0,true);
+
+            document.getElementById('place').addEventListener('click',dobj.fire,false);
+            document.getElementById('ur').addEventListener('click',dobj.reverse,false);
+            document.getElementById('ul').addEventListener('click',dobj.reverse,false);
+            document.getElementById('audio').addEventListener('click',dobj.audio,false);
+
+            var uni = document.getElementById('ul');
+            dobj.uni_width = uni.width;
+            dobj.uni_height = uni.height;
+
+            for(i=1;i<11;i++)
+            {
+                var k = new Image();
+                k.src = "images/s"+i+".gif";
+                k.style.position="fixed";
+                k.style.width=dobj.docwidth*0.15;
+                k.style.top='0px';
+                k.style.left='10000px';
+                k.id = 'sc'+i;
+                bod.appendChild(k);
+            }
+            var sco=document.getElementById('sc1');
+
+            sco.onload = function(){
+                dobj.sc_width = sco.width;
+                dobj.sc_height = sco.height;
+            };
+
+            var snd_files = ["neigh","win","boom","sad","hit"];
+            for (i=0;i<snd_files.length;i++)
+            {
+                dobj.snds[snd_files[i]] = new Audio('audio/'+snd_files[i]+".wav");
+                dobj.snds[snd_files[i]].play();
+                dobj.snds[snd_files[i]].pause();
+            }
+            console.log(dobj.snds);
+
+            dobj.timer = setInterval(function(){dobj.runLoop()},dobj.delay);
+        },
+        audio:function()
+        {
+            dobj.audio = ! dobj.audio;
+
+            if (dobj.audio)
+                document.getElementById('audio').src="images/audio_on.png";
+            else
+                document.getElementById('audio').src="images/audio_off.png";
+
+        },
+        soundplay:function(file)
+        {
+            if (dobj.audio)
+            {
+                dobj.snds[file].play();
+            }
+
+        },
+        animateHearts:function(high_set)
+        {
+            dobj.renderHearts(high_set);
+            if (high_set)
+                dobj.heart_step2++;
+            else
+                dobj.heart_step++;
+            if (dobj.heart_step > 40)
+            {
+                dobj.heart_step = false;
+                dobj.resetHearts(10000,0,false);
+                dobj.renderHearts(false);
+            }
+            else if (dobj.heart_step2 > 40)
+            {
+                dobj.heart_step2 = false;
+                dobj.resetHearts(10000,0,true);
+                dobj.renderHearts(true);
+            }
+            else
+            {
+                var s = (high_set?dobj.hc/2:0);
+                var e = (high_set?dobj.hc:dobj.hc/2);
+                for(i=s;i<e;i++)
+                {
+                    dobj.htsm[i].x=dobj.htsm[i].x + dobj.htsm[i].vx;
+                    dobj.htsm[i].y=dobj.htsm[i].y + dobj.htsm[i].vy;
+                    dobj.htsm[i].vy += 2;
+                    dobj.htsm[i].s+=2;
+                    dobj.htsm[i].r += dobj.htsm[i].dt;
+                }
+            }
+        },
+        resetHearts:function(x,y,high_set)
+        {
+            var s = (high_set?dobj.hc/2:0);
+            var e = (high_set?dobj.hc:dobj.hc/2);
+            for(i=s;i<e;i++)
+            {
+                dobj.htsm[i].s=10;
+                dobj.htsm[i].x=x;
+                dobj.htsm[i].y=y;
+                dobj.htsm[i].vx=Math.random()*dobj.docheight/16 - Math.random()*dobj.docheight/16;
+                dobj.htsm[i].vy=Math.random()*dobj.docheight/16 - Math.random()*dobj.docheight/16;
+                dobj.htsm[i].dt=Math.random()*10 - Math.random()*10;
+                dobj.htsm[i].r=Math.random()*360;
+            }
+        },
+        renderHearts:function(high_set)
+        {
+            var s = (high_set?dobj.hc/2:0);
+            var e = (high_set?dobj.hc:dobj.hc/2);
+            for(i=s;i<e;i++)
+            {
+                var h = document.getElementById('hh'+i);
+                h.style.left=dobj.htsm[i].x+'px';
+                h.style.top=dobj.htsm[i].y+'px';
+                h.style.width=dobj.htsm[i].s+'px';
+                h.style.height=dobj.htsm[i].s+'px';
+                h.style.transform='rotate('+dobj.htsm[i].r+'deg)';
+            }
+        },
+        reverse:function() {
+            if (dobj.uni.dir == 'l')
+            {
+                document.getElementById('ul').style.left='10000px';
+                dobj.uni.dir = 'r';
+            }
+            else
+            {
+                document.getElementById('ur').style.left='10000px';
+                dobj.uni.dir = 'l';
+            }
+            dobj.soundplay("neigh");
+        },
+        runLoop:function() {
+            if (dobj.uni)
+            {
+               var tu = document.getElementById('u'+dobj.uni.dir);
+                tu.style.top = dobj.uni.y+'px';
+                if (dobj.uni.dir == 'l')
+                {
+                    dobj.uni.x-=dobj.docwidth/50;
+                    tu.style.left=dobj.uni.x+'px';
+                    if (dobj.uni.x < - dobj.uni_width)
+                        dobj.uni = false;
+                }
+                else
+                {
+                    dobj.uni.x+=dobj.docwidth/50;
+                    tu.style.left=dobj.uni.x+'px';
+                    if (dobj.uni.x > dobj.docwidth)
+                        dobj.uni = false;
+                }
+            }
+            else if (Math.random() < 0.1)
+            {
+                dobj.uni = {dir:(Math.random()<0.49?'l':'r'),x:0,y:(dobj.docheight-dobj.uni_height)*Math.random()};
+                if (dobj.uni.dir == 'l')
+                    dobj.uni.x = dobj.docwidth;
+                else
+                    dobj.uni.x = - dobj.uni_width;
+            }
+            if (dobj.firing)
+            {
+                dobj.rainBlast();
+            }
+            if (dobj.heart_step > 0)
+            {
+                dobj.animateHearts(false);
+            }
+            if (dobj.score_y > 0)
+            {
+                dobj.animateScore();
+            }
+        },
+        animateScore:function()
+        {
+            var h = document.getElementById('sc'+dobj.score);
+            h.style.left=dobj.score_x+'px';
+            h.style.top=dobj.score_y+'px';
+            dobj.score_y -= dobj.docheight*0.03;
+            if (dobj.score_y < -dobj.sc_height)
+                dobj.score_y = false;
+        },
+        hideScore:function()
+        {
+            for(i=1;i<11;i++)
+                document.getElementById('sc'+i).style.left='10000px';
+        },
+        fire:function(e)
+        {
+	    if (!dobj.firing)
+               dobj.firing = {x: e.clientX, y: e.clientY, step:0};
+        },
+        rainBlast:function(){
+            dobj.ctx.lineWidth = dobj.bandthick;
+            dobj.ctx.strokeStyle = '#'+dobj.rbcols[dobj.firing.step];
+            dobj.ctx.beginPath();
+            dobj.ctx.arc(dobj.firing.x, dobj.firing.y, dobj.rad + dobj.firing.step * dobj.bandthick -1, 0, 2*Math.PI,false);
+            dobj.ctx.stroke();
+            dobj.firing.step++;
+            if (dobj.firing.step > 6)
+            {
+                var ucx = dobj.uni.x+dobj.uni_width/2;
+                var ucy = dobj.uni.y+dobj.uni_height/2;
+                if (Math.abs(ucy-dobj.firing.y) < dobj.uni_height/2 && Math.abs(ucx-dobj.firing.x)<dobj.uni_width/2)
+                {
+                    dobj.resetHearts(dobj.firing.x,dobj.firing.y,false);
+                    dobj.heart_step = 1;
+                    dobj.hidePony();
+                    dobj.hideScore();
+                    dobj.score++;
+                    dobj.score_y = dobj.docheight;
+                    dobj.score_x = dobj.firing.x - dobj.sc_width/2;
+                    dobj.soundplay("hit");
+                    if (dobj.score == 10)
+                        dobj.win();
+                }
+                else
+                {
+                    dobj.soundplay("sad");
+                }
+                dobj.firing = false;
+            }
+        },
+        hidePony:function()
+        {
+            dobj.uni = false;
+            document.getElementById('ul').style.left='10000px';
+            document.getElementById('ur').style.left='10000px';
+        },
+        win:function()
+        {
+            clearInterval(dobj.timer);
+            dobj.hidePony();
+            dobj.hideScore();
+            dobj.ctx.fillStyle = dobj.bgcol;
+            dobj.ctx.strokeStyle = dobj.fgcol;
+            dobj.fill([0, 0, dobj.docwidth, 0, dobj.docwidth, dobj.docheight, 0, dobj.docheight]);
+            dobj.heart_step = 0;
+            dobj.heart_step2 = 0;
+            dobj.soundplay("win");
+            var m = document.getElementById('message');
+            m.style.display="block";
+            var c = document.getElementById('credits');
+            c.style.display="block";
+            var a = document.getElementById('again');
+            a.style.display="block";
+            dobj.timer=setInterval(function(){dobj.winLoop()},dobj.delay);
+
+        },
+        winLoop:function()
+        {
+            if (dobj.heart_step > 0)
+            {
+                dobj.animateHearts(false);
+            }
+            else
+            {
+                dobj.resetHearts(Math.random()*dobj.docwidth/2,Math.random()*dobj.docheight/2,false);
+                dobj.heart_step = 1;
+                var k = document.getElementById('sc10');
+                k.style.left=((dobj.docwidth-dobj.sc_width)/2)+'px';
+                k.style.top='5px';
+            }
+            if (dobj.heart_step2 > 0)
+            {
+                dobj.animateHearts(true);
+                dobj.soundplay("boom");
+            }
+            else if (dobj.heart_step > 20)
+            {
+                dobj.resetHearts(Math.random()*dobj.docwidth/2+dobj.docwidth/2,Math.random()*dobj.docheight/2,true);
+                dobj.heart_step2 = 1;
+            }
+        },
+        box:function(x,y,c)
+        {
+            dobj.ctx.lineWidth = 1;
+            dobj.ctx.strokeStyle = c;
+            dobj.ctx.beginPath();
+            dobj.ctx.rect(x, y, 200,200);
+            dobj.ctx.stroke();
+        },
+        circ:function(x,y,r,c)
+        {
+            dobj.ctx.lineWidth = 1;
+            dobj.ctx.strokeStyle = c;
+            dobj.ctx.beginPath();
+            dobj.ctx.arc(x, y, r, 0, 2 * Math.PI, false);
+            dobj.ctx.stroke();
+        },
+        fill: function (points)
+        {
+            var k_j;
+            dobj.ctx.beginPath();
+            var wid = dobj.ctx.lineWidth;
+            dobj.ctx.lineWidth = 0;
+
+            dobj.ctx.moveTo(points[0], points[1]);
+            for (k_j = 2; k_j < points.length - 1; k_j += 2)
+            {
+                dobj.ctx.lineTo(points[k_j], points[k_j + 1]);
+            }
+            dobj.ctx.lineTo(points[0], points[1]);
+            dobj.ctx.closePath();
+            dobj.ctx.fill();
+            dobj.ctx.lineWidth = wid;
+        }
+    };
+    return dobj;
+}
+
+function go()
+{
+    var canvas = document.getElementById('place');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    if (canvas.getContext)
+    {
+        ctx = canvas.getContext('2d');
+        var dobj = new DesignObj(ctx);
+        dobj.docwidth = canvas.width;
+        dobj.docheight = canvas.height;
+        dobj.initialize();
+    }
+}
+</script>
+<style type="text/css">
+    canvas {
+        border: none;
+    }
+</style>
+</head>
+<body onload="go()">
+<div id="body" class="main">
+    <canvas id="place"></canvas>
+    <img id="ur" src="images/ur.gif">
+    <img id="ul" src="images/ul.gif">
+    <span id="message" style="display:none">Happy 10th Anniversary!<br><i>love,</i><br><i>___Samuel___</i><br>
+    <img src="images/ring.jpg"></span>
+    <a id="again" href="index.html" style="display:none">Restart</a>
+    <a id="credits" href="credits.html" style="display:none">Credits</a>
+    <img id="audio" src="images/audio_on.png">
+</div>
+</body>
+</html>
